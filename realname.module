@@ -13,6 +13,37 @@
  * @defgroup realname Real name API
  */
 
+
+
+/**
+ * Implements hook_autoload_info().
+ */
+function realname_autoload_info() {
+  return array(
+    'RealnameBasicTest' => 'tests/realname.test',
+    'RealnameEntityTest' => 'tests/realname_entity.test',
+  );
+}
+
+
+
+
+
+/**
+ * Implements hook_config_info().
+ */
+function realname_config_info() {
+  $prefixes['realname.settings'] = array(
+    'label' => t('Real Name Settings'),
+    'group' => t('Configuration'),
+  );
+  return $prefixes;
+}
+
+
+
+
+
 /**
  * Implements hook_help().
  */
@@ -92,9 +123,9 @@ function realname_field_extra_fields() {
 }
 
 /**
- * Implements hook_username_alter().
+ * Implements hook_user_format_name_alter().
  */
-function realname_username_alter(&$name, $account) {
+function realname_user_format_name_alter(&$name, $account) {
   static $in_username_alter = FALSE;
 
   if (empty($account->uid)) {
@@ -104,7 +135,7 @@ function realname_username_alter(&$name, $account) {
 
   // Real name was loaded/generated via hook_user_load(), so re-use it.
   if (isset($account->realname)) {
-    if (drupal_strlen($account->realname)) {
+    if (backdrop_strlen($account->realname)) {
       // Only if the real name is a non-empty string is $name actually altered.
       $name = $account->realname;
     }
@@ -119,7 +150,7 @@ function realname_username_alter(&$name, $account) {
     // If $account->realname was undefined, then the user account object was
     // not properly loaded. We must enforce calling user_load().
     if ($realname_account = user_load($account->uid)) {
-      realname_username_alter($name, $realname_account);
+      realname_user_format_name_alter($name, $realname_account);
     }
 
     $in_username_alter = FALSE;
@@ -141,7 +172,7 @@ function realname_user_load($accounts) {
  */
 function realname_user_update(&$edit, $account, $category) {
   // Since user data may have changed, update the realname and its cache.
-  $realnames = &drupal_static('realname_load_multiple', array());
+  $realnames = &backdrop_static('realname_load_multiple', array());
   $realnames[$account->uid] = realname_update($account);
 }
 
@@ -286,7 +317,7 @@ function realname_load($account) {
  *   An array of real names keyed by user ID.
  */
 function realname_load_multiple(array $accounts) {
-  $realnames = &drupal_static(__FUNCTION__, array());
+  $realnames = &backdrop_static(__FUNCTION__, array());
 
   if ($new_accounts = array_diff_key($accounts, $realnames)) {
     // Attempt to fetch realnames from the database first.
@@ -319,8 +350,8 @@ function realname_load_multiple(array $accounts) {
  */
 function realname_update($account) {
   // Get the default pattern and allow other modules to alter it.
-  $pattern = variable_get('realname_pattern', '[user:name-raw]');
-  drupal_alter('realname_pattern', $pattern, $account);
+  $pattern = config_get('realname.settings','realname_pattern');
+  backdrop_alter('realname_pattern', $pattern, $account);
 
   // Perform token replacement on the real name pattern.
   $realname = token_replace($pattern, array('user' => $account), array('clear' => TRUE, 'sanitize' => FALSE));
@@ -331,12 +362,12 @@ function realname_update($account) {
   // Remove double spaces (if a token had no value).
   $realname = preg_replace('/ {2,}/', ' ', $realname);
 
-  // Allow other modules to alter the generated realname.
-  drupal_alter('realname', $realname, $account);
-
   // The name must be trimmed to 255 characters before inserting into the
   // database.
   $realname = truncate_utf8(trim($realname), 255);
+
+  // Allow other modules to alter the generated realname.
+  backdrop_alter('realname', $realname, $account);
 
   // Save to the database and the static cache.
   db_merge('realname')
@@ -350,14 +381,7 @@ function realname_update($account) {
   // Allow modules to react to the realname being updated.
   module_invoke_all('realname_update', $realname, $account);
 
-  // Only if the real name is a non-empty string the name is altered.
-  if (drupal_strlen($realname)) {
-    $account->realname = $realname;
-  }
-
-  // Clear the entity cache.
-  entity_get_controller('user')->resetCache(array($account->uid));
-
+  $account->realname = $realname;
   return $realname;
 }
 
@@ -379,7 +403,7 @@ function realname_delete($uid) {
  */
 function realname_delete_multiple(array $uids) {
   db_delete('realname')->condition('uid', $uids, 'IN')->execute();
-  drupal_static_reset('realname_load_multiple');
+  backdrop_static_reset('realname_load_multiple');
   entity_get_controller('user')->resetCache($uids);
 }
 
@@ -388,7 +412,7 @@ function realname_delete_multiple(array $uids) {
  */
 function realname_delete_all() {
   db_truncate('realname')->execute();
-  drupal_static_reset('realname_load_multiple');
+  backdrop_static_reset('realname_load_multiple');
   entity_get_controller('user')->resetCache();
 }
 
@@ -428,7 +452,7 @@ function realname_autocomplete($field_name, $entity_type, $bundle_name, $string 
     $accounts = user_load_multiple($uids);
 
     foreach ($accounts as $account) {
-      $matches[t('!account (@uid)', array('!account' => format_username($account), '@uid' => $account->uid))] = t('!realname (@username)', array('!realname' => format_username($account), '@username' => $account->name));
+      $matches[t('!account (@uid)', array('!account' => user_format_name($account), '@uid' => $account->uid))] = t('!realname (@username)', array('!realname' => user_format_name($account), '@username' => $account->name));
     }
   }
   // User autocomplete fields.
@@ -445,11 +469,11 @@ function realname_autocomplete($field_name, $entity_type, $bundle_name, $string 
     $accounts = user_load_multiple($uids);
 
     foreach ($accounts as $account) {
-      $matches[$account->name] = t('!realname (@username)', array('!realname' => format_username($account), '@username' => $account->name));
+      $matches[$account->name] = t('!realname (@username)', array('!realname' => user_format_name($account), '@username' => $account->name));
     }
   }
 
-  drupal_json_output($matches);
+  backdrop_json_output($matches);
 }
 
 /**
@@ -508,9 +532,12 @@ function realname_username_raw_token_validate(&$element, &$form_state) {
   // missing. You can force the deactivation of this message by setting the
   // variable `realname_suppress_user_name_mail_validation` to TRUE (or any
   // value that converts to TRUE, like '1').
-  if (!variable_get('realname_suppress_user_name_mail_validation', FALSE) && strpos($value, '[user:name-raw]') === FALSE) {
-    drupal_set_message(t('The %element-title does not contain the <code>[user:name-raw]</code> token, which is necessary when using username for login.', array('%element-title' => $element['#title'])), 'warning');
+  if (!config_get('realname.settings','realname_suppress_user_name_mail_validation') && strpos($value, '[user:name-raw]') === FALSE) {
+    backdrop_set_message(t('The %element-title does not contain the <code>[user:name-raw]</code> token, which is necessary when using username for login.', array('%element-title' => $element['#title'])), 'warning');
   }
 
   return $element;
 }
+
+
+

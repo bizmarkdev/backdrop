@@ -13,18 +13,6 @@ class RealnameEntityTest extends DrupalWebTestCase {
   /**
    * {@inheritdoc}
    */
-  public static function getInfo() {
-    return array(
-      'name' => 'Realname entity tests',
-      'description' => 'Test entity related functionality.',
-      'group' => 'Realname',
-      'dependencies' => array('entity'),
-    );
-  }
-
-  /**
-   * {@inheritdoc}
-   */
   protected function setUp() {
     parent::setUp('entity', 'realname');
 
