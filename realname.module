@@ -13,8 +13,6 @@
  * @defgroup realname Real name API
  */
 
-
-
 /**
  * Implements hook_autoload_info().
  */
@@ -25,10 +23,6 @@ function realname_autoload_info() {
   );
 }
 
-
-
-
-
 /**
  * Implements hook_config_info().
  */
@@ -38,22 +32,6 @@ function realname_config_info() {
     'group' => t('Configuration'),
   );
   return $prefixes;
-}
-
-
-
-
-
-/**
- * Implements hook_help().
- */
-function realname_help($path, $arg) {
-  switch ($path) {
-    // Main module help for the Realname module.
-    case 'admin/config/people/realname':
-    case 'admin/help#realname':
-      return '<p>' . t("A Real Name is what the site developer decides that users' names should look like. It is constructed from various tokens that are available within the site.") . '</p>';
-  }
 }
 
 /**
@@ -538,6 +516,3 @@ function realname_username_raw_token_validate(&$element, &$form_state) {
 
   return $element;
 }
-
-
-
